@@ -4,7 +4,7 @@ import configparser
 import subprocess
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
                              QLabel, QLineEdit, QPushButton, QComboBox, QCheckBox, 
-                             QTextEdit, QFileDialog, QMessageBox, QGroupBox, QProgressBar)
+                             QTextEdit, QFileDialog, QMessageBox, QGroupBox, QProgressBar, QSlider)
 from PyQt5.QtCore import Qt, QThread, pyqtSignal
 from PyQt5.QtGui import QFont, QColor, QPalette
 import json
@@ -49,7 +49,7 @@ class DownloadWorker(QThread):
     progress_changed = pyqtSignal(int)  # 新增进度变化信号
     download_finished = pyqtSignal(bool, str)
     
-    def __init__(self, ytdlp_path, url, download_type, output_path, cookie_path=None, audio_quality=None, video_quality=None, merge_output=None):
+    def __init__(self, ytdlp_path, url, download_type, output_path, cookie_path=None, audio_quality=None, video_quality=None, merge_output=None, thread_count=4):
         super().__init__()
         self.ytdlp_path = ytdlp_path
         self.url = url
@@ -59,11 +59,15 @@ class DownloadWorker(QThread):
         self.audio_quality = audio_quality
         self.video_quality = video_quality
         self.merge_output = merge_output
+        self.thread_count = thread_count
     
     def run(self):
         try:
             # 构建yt-dlp命令
             cmd = [self.ytdlp_path, self.url]
+            
+            # 添加线程数参数
+            cmd.extend(['--concurrent-fragments', str(self.thread_count)])
             
             # 设置输出路径
             if self.output_path:
@@ -299,6 +303,26 @@ class YTDLPGUI(QMainWindow):
         type_layout.addStretch()
         download_layout.addLayout(type_layout)
         
+        # 线程数选择
+        thread_layout = QHBoxLayout()
+        thread_layout.addWidget(QLabel("线程数:"))
+        self.thread_count_slider = QSlider(Qt.Horizontal)
+        self.thread_count_slider.setMinimum(1)
+        self.thread_count_slider.setMaximum(64)
+        self.thread_count_slider.setValue(4)  # 默认4线程
+        self.thread_count_slider.setTickPosition(QSlider.TicksBelow)
+        self.thread_count_slider.setTickInterval(5)
+        self.thread_count_slider.valueChanged.connect(self.on_thread_count_changed)
+        
+        # 线程数显示标签
+        self.thread_count_label = QLabel("4")
+        self.thread_count_label.setFixedWidth(30)
+        
+        thread_layout.addWidget(self.thread_count_slider)
+        thread_layout.addWidget(self.thread_count_label)
+        thread_layout.addStretch()
+        download_layout.addLayout(thread_layout)
+        
         # 连接下载类型选择变化信号
         self.download_type_combo.currentTextChanged.connect(self.on_download_type_changed)
         
@@ -315,6 +339,9 @@ class YTDLPGUI(QMainWindow):
         # 添加合成选项
         self.merge_checkbox = QCheckBox("下载后合成为一个视频")
         self.merge_checkbox.setChecked(True)  # 默认合并
+        
+        # 连接线程数滑动条变化信号
+        self.thread_count_slider.valueChanged.connect(self.on_thread_count_changed)
         
         # 创建布局并添加UI元素
         # 音频质量布局
@@ -385,6 +412,10 @@ class YTDLPGUI(QMainWindow):
         
         # 状态栏
         self.statusBar().showMessage("就绪")
+    
+    def on_thread_count_changed(self, value):
+        # 更新线程数显示标签
+        self.thread_count_label.setText(str(value))
     
     def browse_ytdlp(self):
         file_path, _ = QFileDialog.getOpenFileName(
@@ -458,6 +489,7 @@ class YTDLPGUI(QMainWindow):
         self.output_path = self.output_path_edit.text().strip()
         self.cookie_path = self.cookie_path_edit.text().strip()
         download_type = self.download_type_combo.currentText()
+        thread_count = self.thread_count_slider.value()  # 获取线程数设置
         
         # 验证输入
         if not self.ytdlp_path:
@@ -494,7 +526,12 @@ class YTDLPGUI(QMainWindow):
         # 创建并启动下载线程
         cookie_path = self.cookie_path if self.use_cookie_checkbox.isChecked() else None
         self.worker = DownloadWorker(
-            self.ytdlp_path, url, download_type, self.output_path, cookie_path, audio_format_data, video_format_data, merge_output
+            self.ytdlp_path, url, download_type, self.output_path, 
+            self.cookie_path if self.use_cookie_checkbox.isChecked() else None,
+            self.audio_quality_combo.currentData() if self.audio_quality_combo.isVisible() else None,
+            self.video_quality_combo.currentData() if self.video_quality_combo.isVisible() else None,
+            self.merge_checkbox.isChecked() if self.merge_checkbox.isVisible() else None,
+            thread_count  # 传递线程数参数
         )
         self.worker.progress_updated.connect(self.log_message)
         self.worker.progress_changed.connect(self.update_progress_bar)  # 连接进度变化信号
@@ -631,11 +668,13 @@ class YTDLPGUI(QMainWindow):
             'audio_quality': self.audio_quality_combo.currentText(),  # 保存音频质量设置
             'video_quality': self.video_quality_combo.currentText(),  # 保存视频质量设置
             'use_cookie': str(self.use_cookie_checkbox.isChecked()),
-            'merge_output': str(self.merge_checkbox.isChecked())  # 保存合并选项
+            'merge_output': str(self.merge_checkbox.isChecked()),  # 保存合并选项
+            'thread_count': str(self.thread_count_slider.value())  # 保存线程数设置
         }
         
         try:
-            with open(self.config_file, 'w') as configfile:
+            # 使用UTF-8编码保存配置文件以正确处理中文字符
+            with open(self.config_file, 'w', encoding='utf-8') as configfile:
                 config.write(configfile)
             QMessageBox.information(self, "成功", "配置已保存!")
             self.statusBar().showMessage("配置已保存")
@@ -789,7 +828,8 @@ class YTDLPGUI(QMainWindow):
         if os.path.exists(self.config_file):
             try:
                 config = configparser.ConfigParser()
-                config.read(self.config_file)
+                # 设置编码为utf-8以正确处理中文字符
+                config.read(self.config_file, encoding='utf-8')
                 
                 if 'Settings' in config:
                     settings = config['Settings']
@@ -817,24 +857,39 @@ class YTDLPGUI(QMainWindow):
                     
                     merge_output = settings.get('merge_output', 'True')
                     self.merge_checkbox.setChecked(merge_output.lower() == 'true')
+                    
+                    thread_count = settings.get('thread_count', '4')
+                    self.thread_count_slider.setValue(int(thread_count))
                 
                 self.statusBar().showMessage("配置已加载")
             except Exception as e:
                 self.statusBar().showMessage(f"加载配置失败: {str(e)}")
 
 def main():
-    app = QApplication(sys.argv)
-    
-    # 设置应用程序字体
     try:
-        font = QFont("Segoe UI", 9)
-        app.setFont(font)
+        app = QApplication(sys.argv)
+        
+        # 设置应用程序字体
+        try:
+            font = QFont("Segoe UI", 9)
+            app.setFont(font)
+        except Exception as e:
+            print(f"设置字体时出现错误: {e}")
+        
+        window = YTDLPGUI()
+        window.show()
+        sys.exit(app.exec_())
     except Exception as e:
-        print(f"设置字体时出现错误: {e}")
-    
-    window = YTDLPGUI()
-    window.show()
-    sys.exit(app.exec_())
+        import traceback
+        error_msg = f"程序出现未捕获的异常:\n{str(e)}\n\n详细信息:\n{traceback.format_exc()}"
+        print(error_msg)
+        # 尝试显示错误对话框
+        try:
+            app = QApplication.instance() or QApplication(sys.argv)
+            QMessageBox.critical(None, "严重错误", error_msg)
+        except:
+            pass
+        sys.exit(1)
 
 if __name__ == "__main__":
     main()

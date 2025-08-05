@@ -24,6 +24,8 @@
 
 - 📊 实时显示下载日志与进度条
 
+- ⚙️ 可调节下载线程数（1-64线程滑动条）
+
 ---
 
 ### 📦 环境依赖
@@ -93,6 +95,7 @@ output_path=D:/Downloads
 cookie_path=D:/cookie.txt
 download_type=全部合成
 use_cookie=True
+thread_count=4
 ```
 
 ---
