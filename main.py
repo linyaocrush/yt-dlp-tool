@@ -9,6 +9,7 @@ from PyQt5.QtCore import Qt, QThread, pyqtSignal
 
 class DownloadWorker(QThread):
     progress_updated = pyqtSignal(str)
+    progress_changed = pyqtSignal(int)  # 新增进度变化信号
     download_finished = pyqtSignal(bool, str)
     
     def __init__(self, ytdlp_path, url, download_type, output_path, cookie_path=None):
@@ -55,10 +56,22 @@ class DownloadWorker(QThread):
                 errors='ignore'
             )
             
-            # 实时读取输出
+            # 实时读取输出并解析进度
             for line in process.stdout:
                 line = line.strip()
                 if line:
+                    # 尝试解析进度百分比
+                    if '[download]' in line and '%' in line:
+                        # 提取百分比数字
+                        import re
+                        percent_match = re.search(r'\b(\d+(?:\.\d+)?)\s*%', line)
+                        if percent_match:
+                            try:
+                                percent = float(percent_match.group(1))
+                                self.progress_changed.emit(int(percent))
+                            except ValueError:
+                                pass
+                    
                     self.progress_updated.emit(line)
             
             process.wait()
@@ -224,6 +237,15 @@ class YTDLPGUI(QMainWindow):
             self.log_output.verticalScrollBar().maximum()
         )
     
+    def update_progress_bar(self, value):
+        # 更新进度条的值
+        self.progress_bar.setValue(value)
+        
+        # 如果进度达到100%，设置为确定状态
+        if value >= 100:
+            self.progress_bar.setRange(0, 100)
+            self.progress_bar.setValue(100)
+    
     def start_download(self):
         self.ytdlp_path = self.ytdlp_path_edit.text().strip()
         url = self.url_edit.text().strip()
@@ -252,7 +274,8 @@ class YTDLPGUI(QMainWindow):
         # 禁用下载按钮，显示进度条
         self.download_btn.setEnabled(False)
         self.progress_bar.setVisible(True)
-        self.progress_bar.setRange(0, 0)  # Indeterminate progress
+        self.progress_bar.setRange(0, 100)  # 设置进度条为确定状态
+        self.progress_bar.setValue(0)  # 重置进度条
         
         # 清空日志
         self.log_output.clear()
@@ -263,6 +286,7 @@ class YTDLPGUI(QMainWindow):
             self.ytdlp_path, url, download_type, self.output_path, cookie_path
         )
         self.worker.progress_updated.connect(self.log_message)
+        self.worker.progress_changed.connect(self.update_progress_bar)  # 连接进度变化信号
         self.worker.download_finished.connect(self.on_download_finished)
         self.worker.start()
         
@@ -273,6 +297,7 @@ class YTDLPGUI(QMainWindow):
         self.download_btn.setEnabled(True)
         self.progress_bar.setVisible(False)
         self.progress_bar.setRange(0, 100)
+        self.progress_bar.setValue(0)  # 重置进度条
         
         # 显示结果消息
         if success:
