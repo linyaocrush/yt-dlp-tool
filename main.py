@@ -141,6 +141,14 @@ class YTDLPGUI(QMainWindow):
         cookie_layout.addWidget(browse_cookie_btn)
         download_layout.addLayout(cookie_layout)
         
+        # Cookie使用选项
+        cookie_option_layout = QHBoxLayout()
+        self.use_cookie_checkbox = QCheckBox("使用Cookie文件")
+        self.use_cookie_checkbox.setChecked(True)
+        cookie_option_layout.addWidget(self.use_cookie_checkbox)
+        cookie_option_layout.addStretch()
+        download_layout.addLayout(cookie_option_layout)
+        
         # 下载类型选择
         type_layout = QHBoxLayout()
         type_layout.addWidget(QLabel("下载类型:"))
@@ -237,7 +245,7 @@ class YTDLPGUI(QMainWindow):
             return
         
         # 验证Cookie文件是否存在
-        if self.cookie_path and not os.path.exists(self.cookie_path):
+        if self.use_cookie_checkbox.isChecked() and self.cookie_path and not os.path.exists(self.cookie_path):
             QMessageBox.warning(self, "警告", "Cookie文件不存在，请检查路径!")
             return
         
@@ -250,8 +258,9 @@ class YTDLPGUI(QMainWindow):
         self.log_output.clear()
         
         # 创建并启动下载线程
+        cookie_path = self.cookie_path if self.use_cookie_checkbox.isChecked() else None
         self.worker = DownloadWorker(
-            self.ytdlp_path, url, download_type, self.output_path, self.cookie_path
+            self.ytdlp_path, url, download_type, self.output_path, cookie_path
         )
         self.worker.progress_updated.connect(self.log_message)
         self.worker.download_finished.connect(self.on_download_finished)
@@ -279,7 +288,8 @@ class YTDLPGUI(QMainWindow):
             'ytdlp_path': self.ytdlp_path_edit.text(),
             'output_path': self.output_path_edit.text(),
             'cookie_path': self.cookie_path_edit.text(),
-            'download_type': self.download_type_combo.currentText()
+            'download_type': self.download_type_combo.currentText(),
+            'use_cookie': str(self.use_cookie_checkbox.isChecked())
         }
         
         try:
@@ -306,6 +316,9 @@ class YTDLPGUI(QMainWindow):
                     index = self.download_type_combo.findText(download_type)
                     if index >= 0:
                         self.download_type_combo.setCurrentIndex(index)
+                    
+                    use_cookie = settings.get('use_cookie', 'True')
+                    self.use_cookie_checkbox.setChecked(use_cookie.lower() == 'true')
                 
                 self.statusBar().showMessage("配置已加载")
             except Exception as e:
