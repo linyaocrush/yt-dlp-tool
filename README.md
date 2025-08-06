@@ -48,8 +48,7 @@ pip install pyqt5
 
 1. **下载 yt-dlp 可执行文件**
    
-   下载地址：https://github.com/yt-dlp/yt-dlp/releases  
-   并放置在本地某路径，如：`D:/Tools/yt-dlp.exe`
+   下载main.py
 
 2. **运行程序**
 
@@ -115,5 +114,3 @@ thread_count=4
 MIT License © 2025
 
 ---
-
-如你有 GitHub 页面链接、截图、logo 或演示视频，我也可以帮你加入。如果你希望我把这份 README 直接打包为 `README.md` 文件，也可以告诉我。
