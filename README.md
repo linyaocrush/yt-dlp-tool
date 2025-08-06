@@ -1,8 +1,5 @@
 # yt-dlp tool
 
-以下是适用于你的 PyQt5 视频下载 GUI 工具的 GitHub 项目 `README.md` 模板：
-
----
 
 ## 🎬 YT-DLP GUI 视频下载器（基于 PyQt5）
 
