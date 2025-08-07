@@ -59,6 +59,25 @@ class SingleDownloader(QWidget):
         type_layout.addStretch()
         download_layout.addLayout(type_layout)
 
+        # Cookie设置
+        cookie_layout = QHBoxLayout()
+        self.use_cookie_checkbox = QCheckBox("使用Cookie")
+        self.use_cookie_checkbox.stateChanged.connect(self.on_use_cookie_changed)
+        cookie_layout.addWidget(self.use_cookie_checkbox)
+
+        self.cookie_combo = QComboBox()
+        # 从主窗口加载Cookie文件列表
+        if hasattr(self.parent, 'cookie_files'):
+            self.cookie_combo.addItems(self.parent.cookie_files)
+        # 连接主窗口Cookie更新信号
+        self.parent.cookie_updated.connect(self.update_cookie_combo)
+        self.cookie_combo.setEnabled(False)
+        cookie_layout.addWidget(self.cookie_combo)
+
+
+        cookie_layout.addStretch()
+        download_layout.addLayout(cookie_layout)
+
         # 线程数选择
         thread_layout = QHBoxLayout()
         thread_layout.addWidget(QLabel("线程数:"))
@@ -145,6 +164,7 @@ class SingleDownloader(QWidget):
         self.audio_quality_label.setVisible(False)
         self.audio_quality_combo.setVisible(False)
         self.merge_checkbox.setVisible(False)
+        self.cookie_paths = []  # 存储cookie文件路径
 
         # 连接下载类型选择变化信号
         self.download_type_combo.currentTextChanged.connect(self.on_download_type_changed)
@@ -156,6 +176,22 @@ class SingleDownloader(QWidget):
         directory = CommonFunctions.browse_directory("选择保存目录")
         if directory:
             self.output_path_edit.setText(directory)
+
+    def on_use_cookie_changed(self, state):
+        enabled = state == Qt.Checked
+        self.cookie_combo.setEnabled(enabled)
+
+    def update_config(self, config):
+        # 更新下载器配置
+        self.download_dir = config.get('download_dir', self.download_dir)
+        self.quality = config.get('quality', self.quality)
+        
+    def update_cookie_combo(self, cookie_files):
+        self.cookie_combo.clear()
+        # 添加Cookie名称到下拉框
+        self.cookie_combo.addItems(cookie_files)
+
+
 
     def analyze_video(self):
         ytdlp_path = self.parent.ytdlp_path_edit.text().strip()
@@ -278,9 +314,13 @@ class SingleDownloader(QWidget):
         video_format_data = self.video_quality_combo.currentData()
         merge_output = self.merge_checkbox.isChecked()
 
+        # 获取选中的cookie文件路径
+        cookie_name = self.cookie_combo.currentText() if self.use_cookie_checkbox.isChecked() and self.cookie_combo.currentIndex() != -1 else None
+        cookie_path = self.parent.cookie_files.get(cookie_name) if cookie_name else None
+
         self.worker = DownloadWorker(
             ytdlp_path, url, download_type, output_path,
-            None,
+            cookie_path,
             audio_format_data if self.audio_quality_combo.isVisible() else None,
             video_format_data if self.video_quality_combo.isVisible() else None,
             merge_output if self.merge_checkbox.isVisible() else None,

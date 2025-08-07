@@ -206,12 +206,14 @@ class DownloadWorker(QThread):
             self.download_finished.emit(False, f"下载出错: {str(e)}")
 
 class YTDLPGUI(QMainWindow):
+    cookie_updated = pyqtSignal(list)
     def __init__(self):
         super().__init__()
         self.playlist_window = None
         self.analyze_worker = None
         self.worker = None
         self.config = {}
+        self.cookie_files = []
         self.init_ui()
         self.apply_styles()
 
@@ -240,6 +242,7 @@ class YTDLPGUI(QMainWindow):
         # 创建页面容器
         self.stacked_widget = QStackedWidget()
         self.single_downloader = SingleDownloader(self)
+        self.current_view = self.single_downloader  # 设置当前视图为单文件下载器
         self.playlist_downloader = PlaylistDownloader(self)
         self.settings_view = SettingsView(self)
 
@@ -275,6 +278,8 @@ class YTDLPGUI(QMainWindow):
     
     def update_config(self, config):
         self.config = config
+        self.cookie_files = config.get('cookie_files', [])
+        self.cookie_updated.emit(self.cookie_files)
         # 更新所有视图的配置
         if hasattr(self, 'single_downloader'):
             self.single_downloader.update_config(config)
@@ -409,7 +414,7 @@ def main():
         
         # 设置应用程序字体
         try:
-            font = QFont("Segoe UI", 9)
+            font = QFont("sans-serif", 9)
             app.setFont(font)
         except Exception as e:
             print(f"设置字体时出现错误: {e}")

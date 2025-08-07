@@ -1,4 +1,4 @@
-from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QFileDialog, QGroupBox, QMessageBox)
+from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QFileDialog, QListWidget, QGroupBox, QMessageBox)
 import os
 from common import CommonFunctions
 
@@ -37,17 +37,24 @@ class SettingsView(QWidget):
         output_layout.addWidget(browse_output_btn)
         ytdlp_layout.addLayout(output_layout)
         
-        # Cookie路径设置
-        cookie_layout = QHBoxLayout()
-        cookie_layout.addWidget(QLabel("Cookie路径:"))
-        self.cookie_path_edit = QLineEdit()
-        self.cookie_path_edit.setPlaceholderText("输入cookie文件路径")
-        cookie_layout.addWidget(self.cookie_path_edit)
+        # Cookie文件管理
+        cookie_group = QGroupBox("Cookie文件管理")
+        cookie_group_layout = QVBoxLayout()
         
-        browse_cookie_btn = QPushButton("浏览...")
-        browse_cookie_btn.clicked.connect(self.browse_cookie)
-        cookie_layout.addWidget(browse_cookie_btn)
-        ytdlp_layout.addLayout(cookie_layout)
+        self.cookie_list = QListWidget()
+        cookie_group_layout.addWidget(self.cookie_list)
+        
+        cookie_btn_layout = QHBoxLayout()
+        add_cookie_btn = QPushButton("添加Cookie文件")
+        add_cookie_btn.clicked.connect(self.add_cookie_file)
+        remove_cookie_btn = QPushButton("删除选中Cookie")
+        remove_cookie_btn.clicked.connect(self.remove_selected_cookie)
+        cookie_btn_layout.addWidget(add_cookie_btn)
+        cookie_btn_layout.addWidget(remove_cookie_btn)
+        
+        cookie_group_layout.addLayout(cookie_btn_layout)
+        cookie_group.setLayout(cookie_group_layout)
+        layout.addWidget(cookie_group)
         
         ytdlp_group.setLayout(ytdlp_layout)
         layout.addWidget(ytdlp_group)
@@ -72,16 +79,22 @@ class SettingsView(QWidget):
         if path:
             self.output_path_edit.setText(path)
 
-    def browse_cookie(self):
+    def add_cookie_file(self):
         path, _ = QFileDialog.getOpenFileName(self, "选择Cookie文件", "", "文本文件 (*.txt)")
-        if path:
-            self.cookie_path_edit.setText(path)
+        if path and path not in [self.cookie_list.item(i).text() for i in range(self.cookie_list.count())]:
+            self.cookie_list.addItem(path)
+    
+    def remove_selected_cookie(self):
+        selected_items = self.cookie_list.selectedItems()
+        if selected_items:
+            for item in selected_items:
+                self.cookie_list.takeItem(self.cookie_list.row(item))
 
     def save_settings(self):
         settings = {
             'ytdlp_path': self.ytdlp_path_edit.text().strip(),
             'output_path': self.output_path_edit.text().strip(),
-            'cookie_path': self.cookie_path_edit.text().strip()
+            'cookie_files': [self.cookie_list.item(i).text() for i in range(self.cookie_list.count())]
         }
         # 保存到配置文件
         import json
@@ -105,9 +118,12 @@ class SettingsView(QWidget):
                     settings = json.load(f)
                     self.ytdlp_path_edit.setText(settings.get('ytdlp_path', ''))
                     self.output_path_edit.setText(settings.get('output_path', ''))
-                    self.cookie_path_edit.setText(settings.get('cookie_path', ''))
-                    # 通知主窗口更新配置
-                    if self.parent:
-                        self.parent.update_config(settings)
+                cookie_files = settings.get('cookie_files', [])
+                self.cookie_list.clear()
+                for path in cookie_files:
+                    self.cookie_list.addItem(path)
+                # 通知主窗口更新配置
+                if self.parent:
+                    self.parent.update_config(settings)
             except Exception as e:
                 CommonFunctions.log_message(self.parent.current_view.log_output, f"加载设置失败: {str(e)}")

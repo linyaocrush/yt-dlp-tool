@@ -90,7 +90,16 @@ class PlaylistDownloader(QWidget):
         # Cookie设置
         cookie_layout = QHBoxLayout()
         self.use_cookie_checkbox = QCheckBox("使用Cookie")
+        self.cookie_combo = QComboBox()
+        self.cookie_combo.setEnabled(False)
+        # 从主窗口加载Cookie文件列表
+        if hasattr(self.parent, 'cookie_files'):
+            self.cookie_combo.addItems(self.parent.cookie_files)
+        # 连接主窗口Cookie更新信号
+        self.parent.cookie_updated.connect(self.update_cookie_combo)
+        self.use_cookie_checkbox.stateChanged.connect(self.on_use_cookie_changed)
         cookie_layout.addWidget(self.use_cookie_checkbox)
+        cookie_layout.addWidget(self.cookie_combo)
         main_layout.addLayout(cookie_layout)
 
         # 下载按钮
@@ -161,6 +170,14 @@ class PlaylistDownloader(QWidget):
         CommonFunctions.log_message(self.log_output, f"标题: {resource_info.get('title', '未知')}")
         CommonFunctions.log_message(self.log_output, f"视频总数: {resource_info.get('_total', '未知')}")
 
+    def on_use_cookie_changed(self, state):
+        self.cookie_combo.setEnabled(state == Qt.Checked)
+
+    def update_cookie_combo(self):
+        self.cookie_combo.clear()
+        if self.parent and hasattr(self.parent, 'cookie_files'):
+            self.cookie_combo.addItems(self.parent.cookie_files)
+
     def start_download(self):
         if not self.parent:
             CommonFunctions.show_message("错误", "无法获取主窗口配置!", QMessageBox.Critical)
@@ -169,7 +186,7 @@ class PlaylistDownloader(QWidget):
         ytdlp_path = self.config.get('ytdlp_path', '').strip()
         url = self.url_edit.text().strip()
         output_path = self.config.get('output_path', '').strip()
-        cookie_path = self.config.get('cookie_path', '') if self.use_cookie_checkbox.isChecked() else None
+        cookie_path = self.cookie_combo.currentText() if self.use_cookie_checkbox.isChecked() and self.cookie_combo.currentText() else None
         download_type = self.download_type_combo.currentText()
         thread_count = self.thread_count_slider.value()
         max_count = self.limit_count.value()
