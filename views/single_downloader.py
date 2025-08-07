@@ -48,14 +48,6 @@ class SingleDownloader(QWidget):
         output_layout.addWidget(browse_output_btn)
         download_layout.addLayout(output_layout)
 
-        # Cookie使用选项
-        cookie_option_layout = QHBoxLayout()
-        self.use_cookie_checkbox = QCheckBox("使用Cookie文件")
-        self.use_cookie_checkbox.setChecked(False)
-        cookie_option_layout.addWidget(self.use_cookie_checkbox)
-        cookie_option_layout.addStretch()
-        download_layout.addLayout(cookie_option_layout)
-
         # 下载类型选择
         type_layout = QHBoxLayout()
         type_layout.addWidget(QLabel("下载类型:"))
@@ -129,19 +121,8 @@ class SingleDownloader(QWidget):
         self.download_btn.setObjectName("downloadBtn")
         self.download_btn.clicked.connect(self.start_download)
 
-        self.save_config_btn = QPushButton("保存配置")
-        self.save_config_btn.setObjectName("saveConfigBtn")
-        self.save_config_btn.clicked.connect(self.save_config)
-
         control_layout.addWidget(self.download_btn)
-        control_layout.addWidget(self.save_config_btn)
         control_layout.addStretch()
-
-        # 清除Cookie按钮
-        clear_cookie_btn = QPushButton("清除Cookie设置")
-        clear_cookie_btn.setObjectName("clearCookieBtn")
-        clear_cookie_btn.clicked.connect(self.clear_cookie)
-        control_layout.addWidget(clear_cookie_btn)
 
         main_layout.addLayout(control_layout)
 
@@ -173,15 +154,8 @@ class SingleDownloader(QWidget):
         if directory:
             self.output_path_edit.setText(directory)
 
-    def update_config(self, config):
-        self.config = config
-
-    def clear_cookie(self):
-        self.cookie_path_edit.clear()
-        CommonFunctions.log_message(self.log_output, "Cookie设置已清除")
-
     def analyze_video(self):
-        ytdlp_path = self.config.get('ytdlp_path', '').strip() if hasattr(self, 'config') else ""
+        ytdlp_path = self.parent.ytdlp_path_edit.text().strip()
         url = self.url_edit.text().strip()
 
         if not ytdlp_path or not os.path.exists(ytdlp_path):
@@ -276,7 +250,6 @@ class SingleDownloader(QWidget):
         ytdlp_path = self.parent.ytdlp_path_edit.text().strip()
         url = self.url_edit.text().strip()
         output_path = self.output_path_edit.text().strip()
-        cookie_path = self.cookie_path_edit.text().strip()
         download_type = self.download_type_combo.currentText()
         thread_count = self.thread_count_slider.value()
 
@@ -302,10 +275,9 @@ class SingleDownloader(QWidget):
         video_format_data = self.video_quality_combo.currentData()
         merge_output = self.merge_checkbox.isChecked()
 
-        cookie_path = self.config.get('cookie_path', '') if self.use_cookie_checkbox.isChecked() else None
         self.worker = DownloadWorker(
             ytdlp_path, url, download_type, output_path,
-            cookie_path,
+            None,
             audio_format_data if self.audio_quality_combo.isVisible() else None,
             video_format_data if self.video_quality_combo.isVisible() else None,
             merge_output if self.merge_checkbox.isVisible() else None,
@@ -323,31 +295,3 @@ class SingleDownloader(QWidget):
             CommonFunctions.show_message("成功", "下载完成!", QMessageBox.Information)
         else:
             CommonFunctions.show_message("失败", message, QMessageBox.Critical)
-
-    def clear_cookie(self):
-        self.cookie_path_edit.clear()
-        CommonFunctions.log_message(self.log_output, "Cookie设置已清除")
-
-    def load_config(self, config_file):
-        widgets = {
-            'output_path': self.output_path_edit,
-            'cookie_path': self.cookie_path_edit,
-            'download_type': self.download_type_combo,
-            'thread_count': self.thread_count_slider,
-            'use_cookie': self.use_cookie_checkbox
-        }
-        success, msg = CommonFunctions.load_config(config_file, widgets)
-        if success:
-            CommonFunctions.log_message(self.log_output, msg)
-
-    def save_config(self, config_file):
-        widgets = {
-            'output_path': self.output_path_edit,
-            'cookie_path': self.cookie_path_edit,
-            'download_type': self.download_type_combo,
-            'thread_count': self.thread_count_slider,
-            'use_cookie': self.use_cookie_checkbox
-        }
-        success, msg = CommonFunctions.save_config(config_file, widgets)
-        CommonFunctions.log_message(self.log_output, msg)
-        return success
