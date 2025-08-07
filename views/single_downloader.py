@@ -31,6 +31,7 @@ class SingleDownloader(QWidget):
 
         # 添加分析按钮
         self.analyze_btn = QPushButton("分析")
+        self.analyze_btn.setStyleSheet("background-color: #f0f0f0; border: 1px solid #d0d0d0; padding: 5px 10px;")
         self.analyze_btn.clicked.connect(self.analyze_video)
         url_layout.addWidget(self.analyze_btn)
 
@@ -44,6 +45,7 @@ class SingleDownloader(QWidget):
         output_layout.addWidget(self.output_path_edit)
 
         browse_output_btn = QPushButton("浏览")
+        browse_output_btn.setStyleSheet("background-color: #f0f0f0; border: 1px solid #d0d0d0; padding: 5px 10px;")
         browse_output_btn.clicked.connect(self.browse_output)
         output_layout.addWidget(browse_output_btn)
         download_layout.addLayout(output_layout)
@@ -119,6 +121,7 @@ class SingleDownloader(QWidget):
 
         self.download_btn = QPushButton("开始下载")
         self.download_btn.setObjectName("downloadBtn")
+        self.download_btn.setStyleSheet("background-color: #f0f0f0; border: 1px solid #d0d0d0; padding: 5px 10px;")
         self.download_btn.clicked.connect(self.start_download)
 
         control_layout.addWidget(self.download_btn)
