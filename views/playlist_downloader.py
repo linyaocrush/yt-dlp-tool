@@ -3,7 +3,7 @@ import sys
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QComboBox, QCheckBox, QGroupBox, QProgressBar, QTextEdit, QDateEdit, QSpinBox, QFormLayout)
 from PyQt5.QtCore import Qt, QDate
 from PyQt5.QtGui import QFont
-from ..common import AnalyzeWorker, DownloadWorker, CommonFunctions
+from common import AnalyzeWorker, DownloadWorker, CommonFunctions
 
 
 class PlaylistDownloader(QWidget):
@@ -238,8 +238,6 @@ class PlaylistDownloader(QWidget):
 
     def save_config(self):
         widgets = {
-            'playlist_output_path': self.output_path_edit,
-            'playlist_cookie_path': self.cookie_path_edit,
             'playlist_download_type': self.download_type_combo,
             'playlist_thread_count': self.thread_count_slider,
             'playlist_limit_count': self.limit_count

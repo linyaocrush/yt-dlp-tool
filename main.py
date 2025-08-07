@@ -1,12 +1,13 @@
 import sys
+sys.dont_write_bytecode = True
 import os
 import subprocess
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
                              QLabel, QLineEdit, QPushButton, QComboBox, QCheckBox, 
                              QTextEdit, QFileDialog, QMessageBox, QGroupBox, QProgressBar, QSlider, QStackedWidget)
-from GUI.views.single_downloader import SingleDownloader
-from GUI.views.playlist_downloader import PlaylistDownloader
-from GUI.views.settings import SettingsView
+from views.single_downloader import SingleDownloader
+from views.playlist_downloader import PlaylistDownloader
+from views.settings import SettingsView
 from PyQt5.QtCore import Qt, QThread, pyqtSignal
 from PyQt5.QtGui import QFont, QColor, QPalette
 import json

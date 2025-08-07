@@ -1,7 +1,7 @@
 import os
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QGroupBox, QLabel, QLineEdit, QPushButton, QComboBox, QCheckBox, QSlider, QProgressBar, QTextEdit, QMessageBox)
 from PyQt5.QtCore import Qt
-from ..common import AnalyzeWorker, DownloadWorker, CommonFunctions
+from common import AnalyzeWorker, DownloadWorker, CommonFunctions
 
 class SingleDownloader(QWidget):
     def __init__(self, parent=None):

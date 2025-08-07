@@ -1,6 +1,6 @@
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QFileDialog, QGroupBox, QMessageBox)
 import os
-from GUI.common import CommonFunctions
+from common import CommonFunctions
 
 class SettingsView(QWidget):
     def __init__(self, parent=None):
