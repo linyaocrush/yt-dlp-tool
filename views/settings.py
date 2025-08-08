@@ -1,6 +1,6 @@
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QFileDialog, QListWidget, QGroupBox, QMessageBox)
 import os
-from common import CommonFunctions
+from utils import UIManager
 
 class SettingsView(QWidget):
     def __init__(self, parent=None):
@@ -97,33 +97,58 @@ class SettingsView(QWidget):
             'cookie_files': [self.cookie_list.item(i).text() for i in range(self.cookie_list.count())]
         }
         # 保存到配置文件
-        import json
-        config_path = os.path.join(os.path.expanduser("~"), ".yt_dlp_gui_config.json")
+        import configparser
+        config = configparser.ConfigParser()
+        config['Settings'] = {
+            'ytdlp_path': settings['ytdlp_path'],
+            'output_path': settings['output_path']
+        }
+        
+        # 将cookie文件列表保存为多行值
+        config['Settings']['cookie_files'] = '\n'.join(settings['cookie_files'])
+        
+        # 获取程序所在目录
+        config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "config.ini")
+        config_path = os.path.abspath(config_path)
         try:
             with open(config_path, 'w', encoding='utf-8') as f:
-                json.dump(settings, f, ensure_ascii=False, indent=2)
-            CommonFunctions.log_message(self.parent.current_view.log_output, "设置已保存")
+                config.write(f)
+            UIManager.log_message(self.parent.current_view.log_output, "设置已保存")
             # 通知主窗口更新配置
             if self.parent:
                 self.parent.update_config(settings)
         except Exception as e:
-            CommonFunctions.log_message(self.parent.current_view.log_output, f"保存设置失败: {str(e)}")
+            UIManager.log_message(self.parent.current_view.log_output, f"保存设置失败: {str(e)}")
 
     def load_settings(self):
-        import json
-        config_path = os.path.join(os.path.expanduser("~"), ".yt_dlp_gui_config.json")
+        import configparser
+        # 获取程序所在目录
+        config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "config.ini")
+        config_path = os.path.abspath(config_path)
         if os.path.exists(config_path):
             try:
-                with open(config_path, 'r', encoding='utf-8') as f:
-                    settings = json.load(f)
+                config = configparser.ConfigParser()
+                config.read(config_path, encoding='utf-8')
+                
+                if 'Settings' in config:
+                    settings = config['Settings']
                     self.ytdlp_path_edit.setText(settings.get('ytdlp_path', ''))
                     self.output_path_edit.setText(settings.get('output_path', ''))
-                cookie_files = settings.get('cookie_files', [])
-                self.cookie_list.clear()
-                for path in cookie_files:
-                    self.cookie_list.addItem(path)
-                # 通知主窗口更新配置
-                if self.parent:
-                    self.parent.update_config(settings)
+                    
+                    # 读取cookie文件列表
+                    cookie_files_str = settings.get('cookie_files', '')
+                    cookie_files = cookie_files_str.split('\n') if cookie_files_str else []
+                    self.cookie_list.clear()
+                    for path in cookie_files:
+                        if path:  # 只添加非空路径
+                            self.cookie_list.addItem(path)
+                    
+                    # 通知主窗口更新配置
+                    if self.parent:
+                        self.parent.update_config({
+                            'ytdlp_path': settings.get('ytdlp_path', ''),
+                            'output_path': settings.get('output_path', ''),
+                            'cookie_files': cookie_files
+                        })
             except Exception as e:
-                CommonFunctions.log_message(self.parent.current_view.log_output, f"加载设置失败: {str(e)}")
+                UIManager.log_message(self.parent.current_view.log_output, f"加载设置失败: {str(e)}")

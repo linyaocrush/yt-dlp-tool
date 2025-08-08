@@ -3,7 +3,7 @@ import sys
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QComboBox, QCheckBox, QGroupBox, QProgressBar, QTextEdit, QDateEdit, QSpinBox, QFormLayout)
 from PyQt5.QtCore import Qt, QDate
 from PyQt5.QtGui import QFont
-from common import AnalyzeWorker, DownloadWorker, CommonFunctions
+from utils import AnalyzeWorker, DownloadWorker, UIManager, ConfigManager
 
 
 class PlaylistDownloader(QWidget):
@@ -15,7 +15,7 @@ class PlaylistDownloader(QWidget):
         self.worker = None
         self.init_ui()
         self.load_config()
-        CommonFunctions.apply_styles(self)
+        UIManager.apply_styles(self)
 
     def closeEvent(self, event):
         # 终止所有运行中的工作线程
@@ -94,6 +94,7 @@ class PlaylistDownloader(QWidget):
         self.cookie_combo.setEnabled(False)
         # 从主窗口加载Cookie文件列表
         if hasattr(self.parent, 'cookie_files'):
+            # cookie_files现在是列表类型
             self.cookie_combo.addItems(self.parent.cookie_files)
         # 连接主窗口Cookie更新信号
         self.parent.cookie_updated.connect(self.update_cookie_combo)
@@ -135,20 +136,20 @@ class PlaylistDownloader(QWidget):
 
         # 验证输入
         if not ytdlp_path:
-            CommonFunctions.show_message("警告", "请先在主窗口设置YT-DLP路径!", QMessageBox.Warning)
+            UIManager.show_message("警告", "请先在主窗口设置YT-DLP路径!", QMessageBox.Warning)
             return
 
         if not os.path.exists(ytdlp_path):
-            CommonFunctions.show_message("警告", "YT-DLP程序不存在，请检查路径!", QMessageBox.Warning)
+            UIManager.show_message("警告", "YT-DLP程序不存在，请检查路径!", QMessageBox.Warning)
             return
 
         if not url:
-            CommonFunctions.show_message("警告", "请输入资源URL!", QMessageBox.Warning)
+            UIManager.show_message("警告", "请输入资源URL!", QMessageBox.Warning)
             return
 
         # 禁用分析按钮
         self.analyze_btn.setEnabled(False)
-        CommonFunctions.log_message(self.log_output, "正在分析资源信息...")
+        UIManager.log_message(self.log_output, "正在分析资源信息...")
 
         # 创建并启动分析线程
         self.analyze_worker = AnalyzeWorker(ytdlp_path, url)
@@ -161,14 +162,14 @@ class PlaylistDownloader(QWidget):
 
         # 检查是否有错误
         if "error" in resource_info:
-            CommonFunctions.log_message(self.log_output, f"分析失败: {resource_info['error']}")
-            CommonFunctions.show_message("错误", f"分析失败: {resource_info['error']}", QMessageBox.Critical)
+            UIManager.log_message(self.log_output, f"分析失败: {resource_info['error']}")
+            UIManager.show_message("错误", f"分析失败: {resource_info['error']}", QMessageBox.Critical)
             return
 
         # 更新日志
-        CommonFunctions.log_message(self.log_output, "资源分析完成")
-        CommonFunctions.log_message(self.log_output, f"标题: {resource_info.get('title', '未知')}")
-        CommonFunctions.log_message(self.log_output, f"视频总数: {resource_info.get('_total', '未知')}")
+        UIManager.log_message(self.log_output, "资源分析完成")
+        UIManager.log_message(self.log_output, f"标题: {resource_info.get('title', '未知')}")
+        UIManager.log_message(self.log_output, f"视频总数: {resource_info.get('_total', '未知')}")
 
     def on_use_cookie_changed(self, state):
         self.cookie_combo.setEnabled(state == Qt.Checked)
@@ -176,17 +177,26 @@ class PlaylistDownloader(QWidget):
     def update_cookie_combo(self):
         self.cookie_combo.clear()
         if self.parent and hasattr(self.parent, 'cookie_files'):
+            # cookie_files现在是列表类型
             self.cookie_combo.addItems(self.parent.cookie_files)
 
     def start_download(self):
         if not self.parent:
-            CommonFunctions.show_message("错误", "无法获取主窗口配置!", QMessageBox.Critical)
+            UIManager.show_message("错误", "无法获取主窗口配置!", QMessageBox.Critical)
             return
 
         ytdlp_path = self.config.get('ytdlp_path', '').strip()
         url = self.url_edit.text().strip()
         output_path = self.config.get('output_path', '').strip()
-        cookie_path = self.cookie_combo.currentText() if self.use_cookie_checkbox.isChecked() and self.cookie_combo.currentText() else None
+        cookie_name = self.cookie_combo.currentText() if self.use_cookie_checkbox.isChecked() and self.cookie_combo.currentIndex() != -1 else None
+        # 从主窗口的cookie_files列表中查找对应的完整路径
+        cookie_path = None
+        if cookie_name and hasattr(self.parent, 'cookie_files'):
+            # 在列表中查找匹配的cookie文件
+            for cookie_file in self.parent.cookie_files:
+                if os.path.basename(cookie_file) == cookie_name:
+                    cookie_path = cookie_file
+                    break
         download_type = self.download_type_combo.currentText()
         thread_count = self.thread_count_slider.value()
         max_count = self.limit_count.value()
@@ -195,22 +205,22 @@ class PlaylistDownloader(QWidget):
 
         # 验证输入
         if not ytdlp_path or not os.path.exists(ytdlp_path):
-            CommonFunctions.show_message("警告", "YT-DLP程序不存在，请检查路径!", QMessageBox.Warning)
+            UIManager.show_message("警告", "YT-DLP程序不存在，请检查路径!", QMessageBox.Warning)
             return
 
         if not url:
-            CommonFunctions.show_message("警告", "请输入资源URL!", QMessageBox.Warning)
+            UIManager.show_message("警告", "请输入资源URL!", QMessageBox.Warning)
             return
 
         if not output_path:
-            CommonFunctions.show_message("警告", "请选择保存目录!", QMessageBox.Warning)
+            UIManager.show_message("警告", "请选择保存目录!", QMessageBox.Warning)
             return
 
         # 禁用下载按钮
         self.download_btn.setEnabled(False)
         self.progress_bar.setVisible(True)
         self.progress_bar.setValue(0)
-        CommonFunctions.log_message(self.log_output, "开始下载资源...")
+        UIManager.log_message(self.log_output, "开始下载资源...")
 
         # 构建yt-dlp命令参数
         extra_params = []
@@ -230,18 +240,18 @@ class PlaylistDownloader(QWidget):
             thread_count=thread_count,
             extra_params=extra_params
         )
-        self.worker.progress_updated.connect(lambda msg: CommonFunctions.log_message(self.log_output, msg))
-        self.worker.progress_changed.connect(lambda val: CommonFunctions.update_progress_bar(self.progress_bar, val))
+        self.worker.progress_updated.connect(lambda msg: UIManager.log_message(self.log_output, msg))
+        self.worker.progress_changed.connect(lambda val: UIManager.update_progress_bar(self.progress_bar, val))
         self.worker.download_finished.connect(self.on_download_finished)
         self.worker.start()
 
     def on_download_finished(self, success, message):
         self.download_btn.setEnabled(True)
-        CommonFunctions.log_message(self.log_output, message)
+        UIManager.log_message(self.log_output, message)
         if success:
-            CommonFunctions.show_message("成功", "下载完成!", QMessageBox.Information)
+            UIManager.show_message("成功", "下载完成!", QMessageBox.Information)
         else:
-            CommonFunctions.show_message("失败", message, QMessageBox.Critical)
+            UIManager.show_message("失败", message, QMessageBox.Critical)
 
     def load_config(self):
         widgets = {
@@ -249,9 +259,9 @@ class PlaylistDownloader(QWidget):
             'playlist_thread_count': self.thread_count_slider,
             'playlist_limit_count': self.limit_count
         }
-        success, msg = CommonFunctions.load_config(self.config_file, widgets)
+        success, msg = ConfigManager.load_config(self.config_file, widgets)
         if success:
-            CommonFunctions.log_message(self.log_output, msg)
+            UIManager.log_message(self.log_output, msg)
 
     def save_config(self):
         widgets = {
@@ -259,6 +269,6 @@ class PlaylistDownloader(QWidget):
             'playlist_thread_count': self.thread_count_slider,
             'playlist_limit_count': self.limit_count
         }
-        success, msg = CommonFunctions.save_config(self.config_file, widgets)
-        CommonFunctions.log_message(self.log_output, msg)
+        success, msg = ConfigManager.save_config(self.config_file, widgets)
+        UIManager.log_message(self.log_output, msg)
         return success

@@ -1,7 +1,7 @@
 import os
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QGroupBox, QLabel, QLineEdit, QPushButton, QComboBox, QCheckBox, QSlider, QProgressBar, QTextEdit, QMessageBox)
 from PyQt5.QtCore import Qt
-from common import AnalyzeWorker, DownloadWorker, CommonFunctions
+from utils import AnalyzeWorker, DownloadWorker, UIManager, ConfigManager
 
 class SingleDownloader(QWidget):
     def __init__(self, parent=None):
@@ -37,18 +37,7 @@ class SingleDownloader(QWidget):
 
         download_layout.addLayout(url_layout)
 
-        # 输出路径
-        output_layout = QHBoxLayout()
-        output_layout.addWidget(QLabel("保存路径:"))
-        self.output_path_edit = QLineEdit()
-        self.output_path_edit.setPlaceholderText("请选择下载保存路径")
-        output_layout.addWidget(self.output_path_edit)
 
-        browse_output_btn = QPushButton("浏览")
-        browse_output_btn.setStyleSheet("background-color: #f0f0f0; border: 1px solid #d0d0d0; padding: 5px 10px;")
-        browse_output_btn.clicked.connect(self.browse_output)
-        output_layout.addWidget(browse_output_btn)
-        download_layout.addLayout(output_layout)
 
         # 下载类型选择
         type_layout = QHBoxLayout()
@@ -68,6 +57,7 @@ class SingleDownloader(QWidget):
         self.cookie_combo = QComboBox()
         # 从主窗口加载Cookie文件列表
         if hasattr(self.parent, 'cookie_files'):
+            # cookie_files现在是列表类型
             self.cookie_combo.addItems(self.parent.cookie_files)
         # 连接主窗口Cookie更新信号
         self.parent.cookie_updated.connect(self.update_cookie_combo)
@@ -172,10 +162,6 @@ class SingleDownloader(QWidget):
     def on_thread_count_changed(self, value):
         self.thread_count_label.setText(str(value))
 
-    def browse_output(self):
-        directory = CommonFunctions.browse_directory("选择保存目录")
-        if directory:
-            self.output_path_edit.setText(directory)
 
     def on_use_cookie_changed(self, state):
         enabled = state == Qt.Checked
@@ -194,19 +180,20 @@ class SingleDownloader(QWidget):
 
 
     def analyze_video(self):
-        ytdlp_path = self.parent.ytdlp_path_edit.text().strip()
+        # 从设置页面获取ytdlp路径
+        ytdlp_path = self.parent.config.get('ytdlp_path', '')
         url = self.url_edit.text().strip()
 
         if not ytdlp_path or not os.path.exists(ytdlp_path):
-            CommonFunctions.show_message("警告", "请先设置有效的YT-DLP路径!", QMessageBox.Warning)
+            UIManager.show_message("警告", "请先在设置页面设置有效的YT-DLP路径!", QMessageBox.Warning)
             return
 
         if not url:
-            CommonFunctions.show_message("警告", "请输入视频URL!", QMessageBox.Warning)
+            UIManager.show_message("警告", "请输入视频URL!", QMessageBox.Warning)
             return
 
         self.analyze_btn.setEnabled(False)
-        CommonFunctions.log_message(self.log_output, "正在分析视频信息...")
+        UIManager.log_message(self.log_output, "正在分析视频信息...")
 
         self.analyze_worker = AnalyzeWorker(ytdlp_path, url)
         self.analyze_worker.analysis_finished.connect(self.on_analysis_finished)
@@ -216,11 +203,11 @@ class SingleDownloader(QWidget):
         self.analyze_btn.setEnabled(True)
 
         if "error" in video_info:
-            CommonFunctions.log_message(self.log_output, f"分析失败: {video_info['error']}")
-            CommonFunctions.show_message("错误", f"分析失败: {video_info['error']}", QMessageBox.Critical)
+            UIManager.log_message(self.log_output, f"分析失败: {video_info['error']}")
+            UIManager.show_message("错误", f"分析失败: {video_info['error']}", QMessageBox.Critical)
             return
 
-        CommonFunctions.log_message(self.log_output, "视频分析完成")
+        UIManager.log_message(self.log_output, "视频分析完成")
         self.update_quality_options(video_info)
 
     def update_quality_options(self, video_info):
@@ -286,22 +273,24 @@ class SingleDownloader(QWidget):
             self.merge_checkbox.setVisible(True)
 
     def start_download(self):
-        ytdlp_path = self.parent.ytdlp_path_edit.text().strip()
+        # 从设置页面获取ytdlp路径
+        ytdlp_path = self.parent.config.get('ytdlp_path', '')
         url = self.url_edit.text().strip()
-        output_path = self.output_path_edit.text().strip()
+        # 从设置页面获取输出路径
+        output_path = self.parent.config.get('output_path', '')
         download_type = self.download_type_combo.currentText()
         thread_count = self.thread_count_slider.value()
 
         if not ytdlp_path or not os.path.exists(ytdlp_path):
-            CommonFunctions.show_message("警告", "请设置有效的YT-DLP路径!", QMessageBox.Warning)
+            UIManager.show_message("警告", "请先在设置页面设置有效的YT-DLP路径!", QMessageBox.Warning)
             return
 
         if not url:
-            CommonFunctions.show_message("警告", "请输入视频URL!", QMessageBox.Warning)
+            UIManager.show_message("警告", "请输入视频URL!", QMessageBox.Warning)
             return
 
         if not output_path:
-            CommonFunctions.show_message("警告", "请选择保存目录!", QMessageBox.Warning)
+            UIManager.show_message("警告", "请在设置页面配置输出路径!", QMessageBox.Warning)
             return
 
         self.download_btn.setEnabled(False)
@@ -316,7 +305,13 @@ class SingleDownloader(QWidget):
 
         # 获取选中的cookie文件路径
         cookie_name = self.cookie_combo.currentText() if self.use_cookie_checkbox.isChecked() and self.cookie_combo.currentIndex() != -1 else None
-        cookie_path = self.parent.cookie_files.get(cookie_name) if cookie_name else None
+        cookie_path = None
+        if cookie_name and hasattr(self.parent, 'cookie_files'):
+            # 在列表中查找匹配的cookie文件
+            for cookie_file in self.parent.cookie_files:
+                if os.path.basename(cookie_file) == cookie_name:
+                    cookie_path = cookie_file
+                    break
 
         self.worker = DownloadWorker(
             ytdlp_path, url, download_type, output_path,
@@ -326,15 +321,15 @@ class SingleDownloader(QWidget):
             merge_output if self.merge_checkbox.isVisible() else None,
             thread_count
         )
-        self.worker.progress_updated.connect(lambda msg: CommonFunctions.log_message(self.log_output, msg))
-        self.worker.progress_changed.connect(lambda val: CommonFunctions.update_progress_bar(self.progress_bar, val))
+        self.worker.progress_updated.connect(lambda msg: UIManager.log_message(self.log_output, msg))
+        self.worker.progress_changed.connect(lambda val: UIManager.update_progress_bar(self.progress_bar, val))
         self.worker.download_finished.connect(self.on_download_finished)
         self.worker.start()
 
     def on_download_finished(self, success, message):
         self.download_btn.setEnabled(True)
-        CommonFunctions.log_message(self.log_output, message)
+        UIManager.log_message(self.log_output, message)
         if success:
-            CommonFunctions.show_message("成功", "下载完成!", QMessageBox.Information)
+            UIManager.show_message("成功", "下载完成!", QMessageBox.Information)
         else:
-            CommonFunctions.show_message("失败", message, QMessageBox.Critical)
+            UIManager.show_message("失败", message, QMessageBox.Critical)
